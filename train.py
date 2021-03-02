@@ -1,4 +1,5 @@
 import argparse
+from torch.utils.data import TensorDataset, DataLoader
 
 import torch
 import torch.optim as optim
@@ -20,15 +21,23 @@ parser = argparse.ArgumentParser(description='Train network!')
 parser.add_argument('net', metavar='network', type=str)
 parser.add_argument('dataset', metavar='dataset', type=str)
 parser.add_argument('--lr', metavar='0.0001', type=float, help='learning rate', default=0.0001)
-parser.add_argument('--epochs', metavar='10', type=int, help='no. epochs', default=1)
+parser.add_argument('--epochs', metavar='10', type=int, help='no. epochs', default=10)
 parser.add_argument('--batch-size', metavar='32', type=int, help='batch size', default=32)
+parser.add_argument('--n_classes', metavar='10', type=int, help='batch size', default=10)
 parser.add_argument('--output', metavar='./tmp', type=str, help='output directory', default='./tmp')
 parser.add_argument('--log-interval', metavar='50', type=int, help='logging interval', default=50)
-parser.add_argument('--animation', metavar='50', type=bool, help='logging interval', default=False)
+parser.add_argument('--animation', metavar='50', type=bool, help='logging interval', default=True)
+parser.add_argument('--train_path', type=str, help='1D training data path')
+parser.add_argument('--test_path', type=str, help='1D test data path')
+parser.add_argument('--name', type=str, help='file name suffix for this run', default='')
+parser.add_argument('--comments', type=str, help='to save to metadata file', default='')
 
+#args = parser.parse_args(["siamese-constrastive", "MNIST"])
+#args = parser.parse_args(["siamese-constrastive_1d", "XRD", "--train_path", "xrdsim/data/10_member/train/", "--test_path", "xrdsim/data/10_member/train/"])
 args = parser.parse_args()
+#siamese-constrastive_1d XRD --train_path xrdsim/data/10_member/train/ --test_path xrdsim/data/10_member/train/
 
-add_prefix = lambda x: '%s/%s-%s-%s' % (args.output, args.net, args.dataset, x)
+add_prefix = lambda x: '%s/%s-%s-%s-%s' % (args.output, args.net, args.dataset, args.name, x)
 
 if args.animation:
     os.makedirs(add_prefix('gif'))
@@ -45,11 +54,11 @@ net = networks.net_provider(args.net)
 
 optimizer = optim.Adam(net.parameters(), lr=args.lr)
 
-data = datasets.get_dataset(net.loss, args.dataset, batch_size=args.batch_size)
+data = datasets.get_dataset(net.loss, args.dataset, batch_size=args.batch_size, args = args)
 train_loader, test_loader, original_train_loader, original_test_loader = data
 
-total_loop = args.epochs * len(list(train_loader))
-no_test_samples = len(list(test_loader))
+total_loop = args.epochs * len(train_loader)
+no_test_samples = len(test_loader)
 
 with tqdm(total=total_loop) as pbar:
     status = dict(
@@ -143,3 +152,6 @@ if args.animation:
                     map(lambda x: imageio.imread(x), sorted(glob.glob(add_prefix('gif/*.png')))),
                     duration=0.1)
     shutil.rmtree(add_prefix('gif'))
+
+with open(add_prefix("meta.txt"), 'w') as f:
+    f.write(str(args))

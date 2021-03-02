@@ -1,6 +1,7 @@
 import torch
-
+import pdb
 from torch.utils.data import Dataset
+from torch.utils.data import TensorDataset, DataLoader
 
 import torchvision
 from torchvision import transforms
@@ -13,7 +14,7 @@ import losses
 DATA_PATH = './data'
 
 class SiameseDataset(Dataset):
-    def __init__(self, ds):
+    def __init__(self, ds, n_classes):
         self.dataset = ds
         self.total_data = len(ds)
 
@@ -22,7 +23,7 @@ class SiameseDataset(Dataset):
         else:
             self.labels = ds.test_labels.numpy()
 
-        classes = list(range(10))
+        classes = list(range(n_classes))
         self.label_to_indice = {}
 
         for i in classes:
@@ -83,24 +84,43 @@ class TripetLossDataset(Dataset):
         return self.total_data
 
 
-def get_dataset(loss, name, batch_size=32):
+def get_dataset(loss, name, batch_size=32, args = None):
     data_path = '%s/%s' % (DATA_PATH, name)
     print(data_path)
 
-    tds = getattr(torchvision.datasets, name)
+    if name == 'XRD':
+        train_x = np.load(args.train_path + '/x.npy')
+        train_y = np.load(args.train_path + '/y.npy')
+        test_x = np.load(args.test_path + '/x.npy')
+        test_y = np.load(args.test_path + '/y.npy')
 
-    trainset = tds(root=data_path, train=True, download=True, transform=transforms.ToTensor())
-    testset = tds(root=data_path, train=False, download=True, transform=transforms.ToTensor())
+
+        tensor_x = torch.Tensor(train_x)[:, None, :] # transform to torch tensor
+        tensor_y = torch.Tensor(train_y).squeeze()
+        trainset = TensorDataset(tensor_x,tensor_y) # create your datset
+        trainset.train_labels = tensor_y
+    
+        tensor_x = torch.Tensor(test_x)[:, None, :] # transform to torch tensor
+        tensor_y = torch.Tensor(test_y).squeeze()
+        testset = TensorDataset(tensor_x,tensor_y) # create your datset
+        testset.train_labels = tensor_y
+
+
+    else:
+        tds = getattr(torchvision.datasets, name)
+
+        trainset = tds(root=data_path, train=True, download=True, transform=transforms.ToTensor())
+        testset = tds(root=data_path, train=False, download=True, transform=transforms.ToTensor())
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=1)
     testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=1)
 
     if loss is losses.contastive_loss or loss is losses.binary_cross_entropy:
-        siamese_train_loader = torch.utils.data.DataLoader(SiameseDataset(trainset), batch_size=batch_size,
+        siamese_train_loader = torch.utils.data.DataLoader(SiameseDataset(trainset, n_classes = args.n_classes), batch_size=batch_size,
                                                            shuffle=True,
                                                            num_workers=1)
 
-        siamese_test_loader = torch.utils.data.DataLoader(SiameseDataset(testset), batch_size=batch_size,
+        siamese_test_loader = torch.utils.data.DataLoader(SiameseDataset(trainset, n_classes = args.n_classes), batch_size=batch_size,
                                                           shuffle=False,
                                                           num_workers=1)
 

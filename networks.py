@@ -11,6 +11,9 @@ def net_provider(name, latent_dims=2, **kwargs):
         return Classifier(embedding_net, **kwargs)
     elif name == 'siamese-constrastive':
         return SiameseContrastive(embedding_net, **kwargs)
+    elif name == 'siamese-constrastive_1d':
+        embedding_net = Embedding1D(latent_dims=latent_dims)
+        return SiameseContrastive(embedding_net, **kwargs)
     elif name == 'siamese-binary-cross-entropy':
         return SiameseBinaryCrossEntropy(embedding_net, **kwargs)
     elif name == 'tripet-loss-net':
@@ -64,6 +67,25 @@ class Embedding(nn.Module):
     def forward(self, x):
         return self.encoder(x)
 
+
+class Embedding1D(nn.Module):
+    def __init__(self, latent_dims=2):
+        super(Embedding1D, self).__init__()
+
+        self.encoder = nn.Sequential(
+            nn.Conv1d(1, 6, 27),
+            nn.PReLU(), nn.MaxPool1d(2, 2),
+            nn.Conv1d(6, 16, 27),
+            nn.PReLU(),
+            nn.MaxPool1d(2, 2),
+            Flatten(),
+            nn.Linear(288, 128),
+            nn.PReLU(),
+            nn.Linear(128, latent_dims),
+        )
+
+    def forward(self, x):
+        return self.encoder(x)
 
 class SiameseContrastive(nn.Module):
     def __init__(self, embedding_net, margin=1.0):
